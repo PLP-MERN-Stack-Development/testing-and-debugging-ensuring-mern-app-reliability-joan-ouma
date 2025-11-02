@@ -20,12 +20,6 @@ const log = (message, data = null) => {
     }
 };
 
-const logError = (message, error = null) => {
-    if (DEBUG) {
-        console.error(`🏠 [APP ERROR] ${message}`, error || '');
-    }
-};
-
 const AppContent = () => {
     const { user, loading } = useAuth();
     const [activeView, setActiveView] = useState('dashboard');
@@ -80,7 +74,7 @@ const AppContent = () => {
             log('Bugs data received', { count: data.length });
             setBugs(data);
         } catch (error) {
-            logError('Error fetching bugs', error);
+            console.error('Error fetching bugs:', error);
         } finally {
             setBugsLoading(false);
             log('Bugs fetch completed');
@@ -103,6 +97,12 @@ const AppContent = () => {
         setBugs(prevBugs =>
             prevBugs.map(bug => bug._id === updatedBug._id ? updatedBug : bug)
         );
+    };
+
+    // Handle navigation from dashboard quick actions
+    const handleDashboardNavigation = (view) => {
+        log('Dashboard navigation requested', { from: 'dashboard', to: view });
+        setActiveView(view);
     };
 
     // Handle successful registration - redirect to login
@@ -156,7 +156,13 @@ const AppContent = () => {
 
         switch (activeView) {
             case 'dashboard':
-                return <Dashboard bugs={bugs} user={user} />;
+                return (
+                    <Dashboard
+                        bugs={bugs}
+                        user={user}
+                        onNavigate={handleDashboardNavigation}
+                    />
+                );
             case 'bugs':
                 return (
                     <BugList
@@ -173,10 +179,17 @@ const AppContent = () => {
             case 'projects':
                 return <Projects user={user} />;
             case 'profile':
-                return <UserProfile />;
+                return <UserProfile user={user} />; // ✅ FIXED: Now returns UserProfile instead of Projects
+
             default:
                 log('Unknown view, defaulting to dashboard', { activeView });
-                return <Dashboard bugs={bugs} user={user} />;
+                return (
+                    <Dashboard
+                        bugs={bugs}
+                        user={user}
+                        onNavigate={handleDashboardNavigation}
+                    />
+                );
         }
     };
 

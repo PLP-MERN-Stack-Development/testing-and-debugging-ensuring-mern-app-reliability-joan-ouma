@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Dashboard = ({ bugs, user }) => {
+const Dashboard = ({ bugs, user, onNavigate }) => {
     // Calculate stats from actual bugs data
     const stats = {
         total: bugs.length,
@@ -39,6 +39,30 @@ const Dashboard = ({ bugs, user }) => {
             hour: '2-digit',
             minute: '2-digit'
         });
+    };
+
+    // Debug logging
+    const DEBUG = true;
+    const log = (message, data = null) => {
+        if (DEBUG) {
+            console.log(`📊 [DASHBOARD DEBUG] ${message}`, data || '');
+        }
+    };
+
+    const handleQuickAction = (action) => {
+        log('Quick action clicked', { action });
+        if (onNavigate) {
+            onNavigate(action);
+        } else {
+            console.error('onNavigate function not provided to Dashboard');
+        }
+    };
+
+    const handleViewAllBugs = () => {
+        log('View all bugs clicked');
+        if (onNavigate) {
+            onNavigate('bugs');
+        }
     };
 
     return (
@@ -144,7 +168,7 @@ const Dashboard = ({ bugs, user }) => {
                         )}
                         {bugs.length > 5 && (
                             <button
-                                onClick={() => window.location.href = '/bugs'}
+                                onClick={handleViewAllBugs}
                                 className="w-full mt-4 py-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
                             >
                                 View all bugs →
@@ -161,8 +185,8 @@ const Dashboard = ({ bugs, user }) => {
                     <div className="p-6">
                         <div className="grid grid-cols-2 gap-4">
                             <button
-                                onClick={() => window.location.href = '/create-bug'}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                                onClick={() => handleQuickAction('create-bug')}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group cursor-pointer"
                             >
                                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                                     <span className="text-2xl">🐛</span>
@@ -171,8 +195,8 @@ const Dashboard = ({ bugs, user }) => {
                             </button>
 
                             <button
-                                onClick={() => window.location.href = '/bugs'}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                                onClick={() => handleQuickAction('bugs')}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group cursor-pointer"
                             >
                                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                                     <span className="text-2xl">📋</span>
@@ -180,16 +204,19 @@ const Dashboard = ({ bugs, user }) => {
                                 <span className="mt-3 font-medium text-gray-700">View All Bugs</span>
                             </button>
 
-                            <button className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group">
+                            <button
+                                onClick={() => handleQuickAction('projects')}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group cursor-pointer"
+                            >
                                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                                     <span className="text-2xl">📊</span>
                                 </div>
-                                <span className="mt-3 font-medium text-gray-700">Generate Report</span>
+                                <span className="mt-3 font-medium text-gray-700">Projects</span>
                             </button>
 
                             <button
-                                onClick={() => window.location.href = '/profile'}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                                onClick={() => handleQuickAction('profile')}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors group cursor-pointer"
                             >
                                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                                     <span className="text-2xl">👤</span>
