@@ -51,8 +51,10 @@ const BugList = ({ bugs, loading, onBugDeleted, onBugUpdated, onRefresh, user })
         return value ? value.toString().toLowerCase() : '';
     };
 
-    // Filter bugs based on status and search term with proper null checks
-    const filteredBugs = bugs.filter(bug => {
+    // Ensure bugs is always an array and filter with proper null checks
+    const safeBugs = Array.isArray(bugs) ? bugs : [];
+
+    const filteredBugs = safeBugs.filter(bug => {
         if (!bug) return false;
 
         const matchesFilter = filter === 'all' || bug.status === filter;

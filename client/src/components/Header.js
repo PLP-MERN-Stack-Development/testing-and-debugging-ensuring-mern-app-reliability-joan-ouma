@@ -49,7 +49,7 @@ const Header = ({ sidebarOpen, setSidebarOpen, onSearch, user, setActiveView }) 
             // Store the search query for the BugList component to use
             localStorage.setItem('globalSearchQuery', searchQuery);
 
-            // REMOVED: alert(`Searching for: "${searchQuery}" - Redirecting to bugs page`);
+            // alert(`Searching for: "${searchQuery}" - Redirecting to bugs page`);
 
         } else {
             log('Empty search query, focusing bugs page');

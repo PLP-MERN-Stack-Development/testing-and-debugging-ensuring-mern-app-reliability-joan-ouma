@@ -10,6 +10,7 @@ import UserProfile from './components/UserProfile';
 import Login from './components/Login';
 import Register from './components/Register';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProjectBugs from './components/ProjectBugs';
 
 // Debug mode
 const DEBUG = true;
@@ -54,7 +55,6 @@ const AppContent = () => {
             fetchBugs();
         }
     }, [activeView, user]);
-
     const fetchBugs = async () => {
         log('Starting bugs fetch');
         setBugsLoading(true);
@@ -70,11 +70,17 @@ const AppContent = () => {
 
             log('Bugs fetch response', { status: response.status, ok: response.ok });
 
-            const data = await response.json();
-            log('Bugs data received', { count: data.length });
-            setBugs(data);
+            if (response.ok) {
+                const data = await response.json();
+                log('Bugs data received', { count: data.length });
+                setBugs(data || []);
+            } else {
+                console.error('Failed to fetch bugs');
+                setBugs([]); // Set empty array on error
+            }
         } catch (error) {
             console.error('Error fetching bugs:', error);
+            setBugs([]); // Set empty array on error
         } finally {
             setBugsLoading(false);
             log('Bugs fetch completed');
@@ -177,9 +183,11 @@ const AppContent = () => {
             case 'create-bug':
                 return <BugForm onBugCreated={handleBugCreated} user={user} />;
             case 'projects':
-                return <Projects user={user} />;
+                return <Projects user={user} onNavigate={handleViewChange} />;
+            case 'project-bugs':
+                return <ProjectBugs user={user} onNavigate={handleViewChange} />;
             case 'profile':
-                return <UserProfile user={user} />; // ✅ FIXED: Now returns UserProfile instead of Projects
+                return <UserProfile user={user} />;
 
             default:
                 log('Unknown view, defaulting to dashboard', { activeView });

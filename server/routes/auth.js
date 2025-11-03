@@ -1,9 +1,8 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { auth } = require('../middleware/auth');
 
-// Create router instance
 const router = express.Router();
 
 // Debug mode
@@ -21,19 +20,10 @@ const logError = (message, error = null) => {
     }
 };
 
-// Generate JWT Token
-const generateToken = (userId) => {
-    return jwt.sign({ userId }, process.env.JWT_SECRET || 'fallback_secret', {
-        expiresIn: '30d'
-    });
-};
-
-// @route   POST /api/auth/register
-// @desc    Register a new user
-// @access  Public
+// POST /api/auth/register - Register new user
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, password, firstName, lastName, role } = req.body;
+        const { firstName, lastName, username, email, password, role } = req.body;
 
         log('Registration attempt', { email, username });
 
@@ -45,49 +35,46 @@ router.post('/register', async (req, res) => {
         if (existingUser) {
             logError('User already exists', { email, username });
             return res.status(400).json({
-                error: 'User already exists with this email or username'
+                error: existingUser.email === email ? 'Email already registered' : 'Username already taken'
             });
         }
 
         // Create new user
         const user = new User({
+            firstName,
+            lastName,
             username,
             email,
             password,
-            firstName,
-            lastName,
-            role: role || 'reporter'
+            role: role || 'user'
         });
 
         await user.save();
-        log('User created successfully', { userId: user._id, email });
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'fallback_secret',
+            { expiresIn: '24h' }
+        );
 
-        // Update last login
-        user.lastLogin = new Date();
-        await user.save();
-
-        log('Registration completed', { userId: user._id, tokenGenerated: true });
+        log('Registration successful', { userId: user._id, email: user.email });
 
         res.status(201).json({
-            message: 'User registered successfully',
             token,
             user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
+                _id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                username: user.username,
+                email: user.email,
                 role: user.role,
                 avatar: user.avatar,
                 isActive: user.isActive
             }
         });
-
     } catch (error) {
-        logError('Registration error', error);
+        logError('Registration failed', error);
 
         if (error.name === 'ValidationError') {
             const errors = Object.values(error.errors).map(err => err.message);
@@ -98,148 +85,163 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
+// POST /api/auth/login - Login user
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
         log('Login attempt', { email });
 
-        // Check if user exists
+        // Find user by email
         const user = await User.findOne({ email });
         if (!user) {
             logError('User not found', { email });
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
-        // Check if account is active
+        // Check if user is active
         if (!user.isActive) {
-            logError('Account deactivated', { email });
+            logError('User account deactivated', { email });
             return res.status(400).json({ error: 'Account is deactivated' });
         }
 
         // Check password
-        const isMatch = await user.comparePassword(password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             logError('Invalid password', { email });
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
-        // Generate token
-        const token = generateToken(user._id);
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'fallback_secret',
+            { expiresIn: '24h' }
+        );
 
-        // Update last login
-        user.lastLogin = new Date();
-        await user.save();
-
-        log('Login successful', { userId: user._id, email });
+        log('Login successful', { userId: user._id, email: user.email });
 
         res.json({
-            message: 'Login successful',
             token,
             user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
+                _id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                username: user.username,
+                email: user.email,
                 role: user.role,
                 avatar: user.avatar,
                 isActive: user.isActive
             }
         });
-
     } catch (error) {
-        logError('Login error', error);
+        logError('Login failed', error);
         res.status(500).json({ error: 'Server error during login' });
     }
 });
 
-// @route   GET /api/auth/me
-// @desc    Get current user
-// @access  Private
-router.get('/me', auth, async (req, res) => {
+// GET /api/auth/me - Get current user
+router.get('/me', async (req, res) => {
     try {
-        log('Get current user', { userId: req.user._id });
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+
+        log('Get current user request', { hasToken: !!token });
+
+        if (!token) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+        const user = await User.findById(decoded.userId);
+
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        if (!user.isActive) {
+            return res.status(401).json({ error: 'Account deactivated' });
+        }
+
+        log('Current user fetched', { userId: user._id, email: user.email });
+
         res.json({
             user: {
-                id: req.user._id,
-                username: req.user.username,
-                email: req.user.email,
-                firstName: req.user.firstName,
-                lastName: req.user.lastName,
-                role: req.user.role,
-                avatar: req.user.avatar,
-                isActive: req.user.isActive,
-                createdAt: req.user.createdAt
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
             }
         });
     } catch (error) {
-        logError('Get user error', error);
-        res.status(500).json({ error: 'Server error' });
+        logError('Get current user failed', error);
+        res.status(401).json({ error: 'Invalid token' });
     }
 });
 
-// @route   PUT /api/auth/profile
-// @desc    Update user profile
-// @access  Private
-router.put('/profile', auth, async (req, res) => {
+// PUT /api/auth/profile - Update user profile
+router.put('/profile', async (req, res) => {
     try {
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+
+        if (!token) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+        const user = await User.findById(decoded.userId);
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
         const { firstName, lastName, username, email, avatar } = req.body;
-        const userId = req.user._id;
 
-        log('Profile update attempt', { userId, updates: req.body });
-
-        // Check if username or email is taken by another user
-        if (username || email) {
-            const existingUser = await User.findOne({
-                $and: [
-                    { _id: { $ne: userId } },
-                    { $or: [{ email }, { username }] }
-                ]
-            });
-
+        // Check if username or email is already taken by another user
+        if (username && username !== user.username) {
+            const existingUser = await User.findOne({ username, _id: { $ne: user._id } });
             if (existingUser) {
-                logError('Username or email already taken', { userId, username, email });
-                return res.status(400).json({
-                    error: 'Username or email already taken'
-                });
+                return res.status(400).json({ error: 'Username already taken' });
             }
         }
 
-        const updateData = {};
-        if (firstName) updateData.firstName = firstName;
-        if (lastName) updateData.lastName = lastName;
-        if (username) updateData.username = username;
-        if (email) updateData.email = email;
-        if (avatar) updateData.avatar = avatar;
+        if (email && email !== user.email) {
+            const existingUser = await User.findOne({ email, _id: { $ne: user._id } });
+            if (existingUser) {
+                return res.status(400).json({ error: 'Email already registered' });
+            }
+        }
 
-        const user = await User.findByIdAndUpdate(
-            userId,
-            updateData,
-            { new: true, runValidators: true }
-        );
+        // Update user fields
+        if (firstName) user.firstName = firstName;
+        if (lastName) user.lastName = lastName;
+        if (username) user.username = username;
+        if (email) user.email = email;
+        if (avatar !== undefined) user.avatar = avatar;
 
-        log('Profile updated successfully', { userId });
+        await user.save();
+
+        log('Profile updated', { userId: user._id });
 
         res.json({
-            message: 'Profile updated successfully',
             user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
+                _id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                username: user.username,
+                email: user.email,
                 role: user.role,
                 avatar: user.avatar,
                 isActive: user.isActive
             }
         });
-
     } catch (error) {
-        logError('Update profile error', error);
+        logError('Profile update failed', error);
 
         if (error.name === 'ValidationError') {
             const errors = Object.values(error.errors).map(err => err.message);
@@ -250,36 +252,39 @@ router.put('/profile', auth, async (req, res) => {
     }
 });
 
-// @route   PUT /api/auth/password
-// @desc    Change password
-// @access  Private
-router.put('/password', auth, async (req, res) => {
+// PUT /api/auth/password - Change password
+router.put('/password', async (req, res) => {
     try {
-        const { currentPassword, newPassword } = req.body;
+        const token = req.header('Authorization')?.replace('Bearer ', '');
 
-        log('Password change attempt', { userId: req.user._id });
-
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: 'Current password and new password are required' });
+        if (!token) {
+            return res.status(401).json({ error: 'No token provided' });
         }
 
-        const user = await User.findById(req.user._id);
-        const isMatch = await user.comparePassword(currentPassword);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+        const user = await User.findById(decoded.userId);
 
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const { currentPassword, newPassword } = req.body;
+
+        // Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
-            logError('Current password incorrect', { userId: req.user._id });
             return res.status(400).json({ error: 'Current password is incorrect' });
         }
 
+        // Update password
         user.password = newPassword;
         await user.save();
 
-        log('Password changed successfully', { userId: req.user._id });
+        log('Password changed', { userId: user._id });
 
         res.json({ message: 'Password updated successfully' });
-
     } catch (error) {
-        logError('Change password error', error);
+        logError('Password change failed', error);
 
         if (error.name === 'ValidationError') {
             const errors = Object.values(error.errors).map(err => err.message);

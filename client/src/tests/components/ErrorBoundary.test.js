@@ -8,7 +8,7 @@ const BuggyComponent = () => {
     throw new Error('Test error');
 };
 
-// Mock component that works fine
+// Mock component
 const GoodComponent = () => <div>Good Component</div>;
 
 describe('ErrorBoundary', () => {

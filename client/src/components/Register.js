@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const Register = ({ onSwitchToLogin, onRegistrationSuccess }) => {  // Add onRegistrationSuccess prop
+const Register = ({ onSwitchToLogin, onRegistrationSuccess }) => {
     const [formData, setFormData] = useState({
         username: '',
         email: '',

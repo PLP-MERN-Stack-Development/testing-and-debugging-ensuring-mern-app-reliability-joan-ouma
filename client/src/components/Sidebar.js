@@ -1,7 +1,6 @@
 import React from 'react';
 
 const Sidebar = ({ activeView, setActiveView, sidebarOpen, setSidebarOpen, user }) => {
-    // Remove 'reports' from menuItems since it's the same as dashboard
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
         { id: 'bugs', label: 'All Bugs', icon: '🐛' },

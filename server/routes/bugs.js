@@ -1,5 +1,6 @@
 const express = require('express');
 const Bug = require('../models/Bug');
+const Project=require('../models/Project');
 
 // Create router instance
 const router = express.Router();
@@ -19,25 +20,32 @@ const logError = (message, error = null) => {
     }
 };
 
-// GET /api/bugs - Get all bugs with filtering
+// GET /api/bugs - Get all bugs with filtering and project support
 router.get('/', async (req, res) => {
     try {
-        const { status, priority, search } = req.query;
+        const { status, priority, search, project } = req.query;
 
-        log('Fetching bugs', { status, priority, search });
+        log('Fetching bugs', { status, priority, search, project });
 
         let filter = {};
 
-        if (status) filter.status = status;
-        if (priority) filter.priority = priority;
+        if (status && status !== 'all') filter.status = status;
+        if (priority && priority !== 'all') filter.priority = priority;
+        if (project && project !== 'all') filter.project = project;
+
         if (search) {
             filter.$or = [
                 { title: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } }
+                { description: { $regex: search, $options: 'i' } },
+                { bugNumber: { $regex: search, $options: 'i' } }
             ];
         }
 
-        const bugs = await Bug.find(filter).sort({ createdAt: -1 });
+        const bugs = await Bug.find(filter)
+            .populate('reportedBy', 'firstName lastName username avatar')
+            .populate('assignedTo', 'firstName lastName username avatar')
+            .populate('project', 'name projectKey')
+            .sort({ createdAt: -1 });
 
         log('Bugs fetched successfully', { count: bugs.length });
 
@@ -55,7 +63,11 @@ router.get('/:id', async (req, res) => {
 
         log('Fetching single bug', { bugId: id });
 
-        const bug = await Bug.findById(id);
+        const bug = await Bug.findById(id)
+            .populate('reportedBy', 'firstName lastName username avatar')
+            .populate('assignedTo', 'firstName lastName username avatar')
+            .populate('project', 'name projectKey bugTypes');
+
         if (!bug) {
             logError('Bug not found', { bugId: id });
             return res.status(404).json({ error: 'Bug not found' });
@@ -70,20 +82,49 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/bugs - Create new bug
+// POST /api/bugs - Create new bug with project support
 router.post('/', async (req, res) => {
     try {
         log('Creating new bug', { data: req.body });
 
         const bugData = {
             ...req.body,
-            bugNumber: `BUG-${Date.now()}` // Generate unique bug number
+            // Let the model handle bug number generation based on project
+            bugNumber: undefined // Remove this line to let the model handle it
         };
+
+        // If project is specified and Project model exists, validate bug type
+        if (bugData.project && Project) {
+            const project = await Project.findById(bugData.project);
+            if (project) {
+                // Check if the bug type is valid for this project
+                const validTypes = project.bugTypes && project.bugTypes.length > 0
+                    ? project.bugTypes.map(t => t.name)
+                    : ['Functional', 'Visual', 'Performance', 'Security', 'Usability', 'Compatibility'];
+
+                if (bugData.type && !validTypes.includes(bugData.type)) {
+                    return res.status(400).json({
+                        error: `Invalid bug type. Available types: ${validTypes.join(', ')}`
+                    });
+                }
+            }
+        }
 
         const bug = new Bug(bugData);
         const savedBug = await bug.save();
 
-        log('Bug created successfully', { bugId: savedBug._id, bugNumber: savedBug.bugNumber });
+        // Populate the created bug
+        await savedBug.populate('reportedBy', 'firstName lastName username avatar');
+        await savedBug.populate('assignedTo', 'firstName lastName username avatar');
+        if (savedBug.project && Project) {
+            await savedBug.populate('project', 'name projectKey');
+        }
+
+        log('Bug created successfully', {
+            bugId: savedBug._id,
+            bugNumber: savedBug.bugNumber,
+            project: savedBug.project
+        });
 
         res.status(201).json(savedBug);
     } catch (error) {
@@ -105,11 +146,30 @@ router.put('/:id', async (req, res) => {
 
         log('Updating bug', { bugId: id, updates: req.body });
 
+        // If updating type and project exists and Project model exists, validate the type
+        if (req.body.type && req.body.project && Project) {
+            const project = await Project.findById(req.body.project);
+            if (project) {
+                const validTypes = project.bugTypes && project.bugTypes.length > 0
+                    ? project.bugTypes.map(t => t.name)
+                    : ['Functional', 'Visual', 'Performance', 'Security', 'Usability', 'Compatibility'];
+
+                if (!validTypes.includes(req.body.type)) {
+                    return res.status(400).json({
+                        error: `Invalid bug type. Available types: ${validTypes.join(', ')}`
+                    });
+                }
+            }
+        }
+
         const bug = await Bug.findByIdAndUpdate(
             id,
             req.body,
             { new: true, runValidators: true }
-        );
+        )
+            .populate('reportedBy', 'firstName lastName username avatar')
+            .populate('assignedTo', 'firstName lastName username avatar')
+            .populate('project', 'name projectKey');
 
         if (!bug) {
             logError('Bug not found for update', { bugId: id });

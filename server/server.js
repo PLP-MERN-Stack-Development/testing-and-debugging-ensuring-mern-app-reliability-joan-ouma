@@ -6,6 +6,9 @@ require('dotenv').config();
 // Import routes
 const authRoutes = require('./routes/auth');
 const bugRoutes = require('./routes/bugs');
+const projectRoutes = require('./routes/projects');
+const projectBugsRoutes = require('./routes/projectBugs');
+
 
 const app = express();
 
@@ -30,6 +33,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // Logging middleware
 app.use((req, res, next) => {
     log(`${req.method} ${req.path}`, {
@@ -44,6 +48,8 @@ app.use((req, res, next) => {
 log('Setting up routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/bugs', bugRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/projects', projectBugsRoutes);
 
 // Basic routes
 app.get('/', (req, res) => {

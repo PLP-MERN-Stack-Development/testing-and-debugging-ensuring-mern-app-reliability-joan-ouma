@@ -23,7 +23,7 @@ const BugForm = ({ onBugCreated, projects = [] }) => {
         estimatedHours: '',
         actualHours: '',
         tags: [],
-        reporter: 'current-user', // This would come from auth context
+        reporter: 'current-user', //comes from AuthContext
         assignee: ''
     });
 
@@ -32,7 +32,7 @@ const BugForm = ({ onBugCreated, projects = [] }) => {
     const [success, setSuccess] = useState('');
     const [newTag, setNewTag] = useState('');
 
-    // Mock projects data - in real app, this would come from API
+    // Mock projects data
     const mockProjects = [
         { _id: '1', name: 'Website Redesign', key: 'WEB' },
         { _id: '2', name: 'Mobile App', key: 'MOB' },
@@ -40,7 +40,7 @@ const BugForm = ({ onBugCreated, projects = [] }) => {
         { _id: '4', name: 'Database Optimization', key: 'DB' }
     ];
 
-    // Mock users for assignment - in real app, this would come from API
+    // Mock users for assignment
     const mockUsers = [
         { _id: '1', name: 'John Developer', role: 'developer' },
         { _id: '2', name: 'Sarah Tester', role: 'tester' },
@@ -116,7 +116,7 @@ const BugForm = ({ onBugCreated, projects = [] }) => {
             name: file.name,
             size: file.size,
             type: file.type,
-            url: URL.createObjectURL(file) // In real app, this would be uploaded to server
+            url: URL.createObjectURL(file)
         }));
 
         setFormData(prev => ({

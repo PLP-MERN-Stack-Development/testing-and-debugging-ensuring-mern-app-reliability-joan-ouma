@@ -11,6 +11,14 @@ const bugSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Description is required']
     },
+    project: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Project'
+    },
+    projectKey: {
+        type: String
+    },
+
     status: {
         type: String,
         enum: ['open', 'in-progress', 'resolved', 'closed'],
@@ -55,6 +63,29 @@ const bugSchema = new mongoose.Schema({
     }
 }, {
     timestamps: true
+});
+
+
+
+// Update the bug number generation to include project key
+bugSchema.pre('save', async function(next) {
+    if (this.isNew) {
+        if (this.project) {
+            const project = await mongoose.model('Project').findById(this.project);
+            if (project) {
+                const bugCount = await mongoose.model('Bug').countDocuments({ project: this.project });
+                this.bugNumber = `${project.projectKey}-${(bugCount + 1).toString().padStart(3, '0')}`;
+                this.projectKey = project.projectKey;
+            } else {
+                // Fallback to original bug number generation
+                this.bugNumber = `BUG-${Date.now()}`;
+            }
+        } else {
+            // Fallback to original bug number generation
+            this.bugNumber = `BUG-${Date.now()}`;
+        }
+    }
+    next();
 });
 
 // Add index for better query performance
